@@ -10,9 +10,22 @@
 		5EE558C13028EA7C00CF62D4 /* Beth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Beth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5EE558FD3028EB2C00CF62D4 /* Exceptions for "Beth" folder in "Beth" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5EE558C03028EA7C00CF62D4 /* Beth */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5EE558C33028EA7C00CF62D4 /* Beth */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5EE558FD3028EB2C00CF62D4 /* Exceptions for "Beth" folder in "Beth" target */,
+			);
 			path = Beth;
 			sourceTree = "<group>";
 		};
@@ -249,11 +262,13 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Beth/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = apps.ramirezlabs.Beth;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -281,11 +296,13 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Beth/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = apps.ramirezlabs.Beth;
 				PRODUCT_NAME = "$(TARGET_NAME)";
