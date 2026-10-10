@@ -65,9 +65,18 @@ struct ActionValidator {
         .addItem, .removeItem, .sendMessage, .search
     ]
 
+    /// Intents where an empty object is often legitimate.
+    /// "Set a reminder for 3pm" and "Put on something upbeat" are
+    /// complete requests with nothing to name. Rule 3 applies a
+    /// narrower test to these rather than exempting them entirely.
+    static let intentsAllowingEmptyObject: Set<ActionIntent> = [
+        .setReminder, .adjustSetting, .playMusic
+    ]
+
     enum Rejection: String {
         case pronounAsObject = "object is a referring expression"
         case missingRequiredObject = "intent requires an object, none given"
+        case danglingReferentInSentence = "no object, and the sentence only refers"
     }
 
     /// Returns a rejection reason, or nil when the action looks executable.
@@ -99,7 +108,32 @@ struct ActionValidator {
             return .missingRequiredObject
         }
 
+        // RULE 3 (v2): exempt intent, empty object, and the sentence
+        // itself only refers. "Play it again" has no object and no noun
+        // to fall back on. "Put on something upbeat" has no object
+        // either, but nothing in it points at an unnamed thing.
+        //
+        // CAVEAT WORTH REPEATING: this rule was derived by reading
+        // failures in TestSuite. Scoring it on TestSuite would be
+        // fitting to the benchmark. HeldOutSuite is the honest test.
+        if object.isEmpty
+            && intentsAllowingEmptyObject.contains(action.intent)
+            && sentenceContainsReferringExpression(sentence) {
+            return .danglingReferentInSentence
+        }
+
         return nil
+    }
+
+    /// Whether any standalone word in the sentence refers rather than
+    /// names. Word-boundary matching matters: a naive `contains` would
+    /// fire on "it" inside "Italian" and reject a valid search.
+    private static func sentenceContainsReferringExpression(_ sentence: String) -> Bool {
+        let words = sentence
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        return words.contains { referringExpressions.contains($0) }
     }
 
     /// The intent the app should actually act on.

@@ -1,8 +1,16 @@
 # Pilot Study: Natural Language to Structured App Actions on a 3B On-Device Model
 
-**Date:** August 1, 2026
-**Platform:** macOS 27, Apple Foundation Models (`SystemLanguageModel`), Swift, `@Generable` constrained decoding
+**Dates:** August 1 and August 23, 2026
+**Platform:** macOS 27 beta, Apple Foundation Models (`SystemLanguageModel`), Swift, `@Generable` constrained decoding
 **Status:** Pilot. Not publishable as-is. See Limitations.
+
+> **CRITICAL: two model conditions, not one.**
+> A macOS beta update between the two dates replaced the on-device
+> model. Median latency fell from 1.10s to 0.66s and the failure
+> signature changed completely. Results from the two dates are **not
+> comparable** and are reported separately as **Model A** (Aug 1) and
+> **Model B** (Aug 23). Neither build number was recorded at the time,
+> which is itself a finding. See section 5f.
 
 ---
 
@@ -23,7 +31,7 @@ Whether a small on-device language model can convert a spoken request into a str
 
 ---
 
-## 2. Headline results (v4 schema, 3 trials, n=96)
+## 2. Headline results — Model A (v4 schema, 3 trials, n=96)
 
 | Metric | Value |
 |---|---|
@@ -57,7 +65,7 @@ This is not a failure to notice that the referent is unresolved. From the model'
 
 ---
 
-## 4. Three interventions, measured
+## 4. Three interventions, measured — all on Model A
 
 ### 4a. Prose instruction (failed)
 
@@ -106,7 +114,7 @@ Validator: 7 rejections, 6 correct, 1 false alarm, precision 86%. Zero added lat
 
 ---
 
-## 5. Secondary findings
+## 5. Secondary findings — Model A unless noted
 
 ### 5a. Constraint propagation between fields is asymmetric
 
@@ -151,6 +159,69 @@ All conclusions in this document rest on 3-trial runs except where explicitly no
 
 ---
 
+## 5f. The validator was defeated by a model upgrade
+
+The most important result in this document, and it was found by accident.
+
+Between August 1 and August 23 a macOS beta update replaced the on-device model. Model B is faster (0.66s vs 1.10s median) and by ordinary measures better. The validator, which raised intent accuracy from 76% to 92% on Model A, collapsed on Model B.
+
+### Dev set, same 32 cases, same validator code
+
+| | Model A (Aug 1) | Model B (Aug 23) |
+|---|---|---|
+| Raw intent accuracy | 76% | 71% |
+| Validated intent accuracy | **92%** | **74%** |
+| Median latency | 1.10s | 0.66s |
+
+### Mechanism: fluency converted a detectable failure into an undetectable one
+
+Model A, when it could not resolve a referent, left evidence. It placed the referring expression itself into the object slot, or left the slot empty. Both are trivially detectable in code, which is precisely why the validator worked.
+
+Model B fills the slot with a plausible invented noun:
+
+| Sentence | Model A | Model B |
+|---|---|---|
+| "Add it" | object: `it` | object: **`milk`** |
+| "Get rid of the last one" | object: empty | object: `last one` |
+| "Play it again" | object: empty | object: `music` |
+| "Put that on there" | `addItem` | **`sendMessage` to `John`** |
+
+"Add it" produced `milk`. "Put that on there" produced a message to `John`. Neither noun appears anywhere in the input. Both were confabulated at 0.90 confidence.
+
+Rule 1 matches referring expressions and cannot match a real noun. Rule 2 requires an empty object and the slot is now full. The validator is not miscalibrated on Model B. It is inert.
+
+### Rule 3 fired zero times in 45 held-out trials
+
+Rule 3 was added to catch object-exempt intents with empty objects. Model B does not produce empty objects, so the rule never triggered. It was obsolete before it was first measured.
+
+### Held-out set results (Model B only)
+
+| | Raw | Validated |
+|---|---|---|
+| Overall | 60% | 64% |
+| Should-reject half (24 trials) | 33% | 33% |
+| Should-accept half (21 trials) | 100% | **100%** |
+
+Zero false alarms. The validator is not too aggressive; it has nothing to grip.
+
+"Make it a little dimmer", written deliberately to trip Rule 3 on surface form, passed cleanly on all three trials. The predicted false positive did not occur because the rule never fired.
+
+### The claim
+
+**External validation is coupled to a specific failure signature, and that signature is not stable across model versions.**
+
+A validator that was correct, tested, honestly measured, and demonstrably effective was rendered useless by a routine OS update the user did not initiate, which produced no error, no warning, and no visible change other than improved performance.
+
+This is a direct problem for the recommendation in section 4c. External validation still outperformed both model-side interventions on Model A. But anyone deploying this pattern against a platform-provided model inherits a silent regression risk on every OS update, with no way to detect it short of continuously rerunning a benchmark.
+
+### Secondary observation: a more capable model was harder to safeguard
+
+Model B is faster and comparably accurate on the naturalistic tiers. It is nonetheless harder to build a safety check around, because its errors are more fluent. This runs against the intuition that model improvements make downstream safeguards easier.
+
+Stated carefully: one task, two models, one platform, both betas. A hypothesis worth testing across the Phase 2 model ladder, not an established result.
+
+---
+
 ## 6. Limitations
 
 These are substantial. The study is a pilot.
@@ -163,7 +234,9 @@ These are substantial. The study is a pilot.
 - **Synthetic input.** Sentences were written to probe categories, not sampled from real user speech.
 - **No ASR in the loop.** Real voice input introduces transcription errors upstream that would compound with these results.
 - **English only.**
-- **Validator result is 1 trial.** Must be rerun at 3 before the 94% figure is cited.
+- **Two model conditions, discovered after the fact.** The OS build was not recorded on either date. Model A and Model B are distinguished by latency and failure signature, not by a logged identifier. Build stamping is now automatic; prior numbers are approximately dated rather than precisely attributed.
+- **Both models are betas.** They change without notice and may regress before release. No claim here should be phrased as "Apple's model does X"; it is "this build behaved this way on this date."
+- **Held-out authorship was split**: four reject and four accept cases by Claude (which also wrote the validator), four reject and three accept by Alexander. A partial control, not a real one.
 
 ---
 
@@ -184,6 +257,8 @@ Literature to review before claiming any of these: coreference and anaphora reso
 
 ## 8. What this establishes for the dissertation premise
 
-The task does not require world knowledge. A 3B model that cannot answer trivia questions reaches 78% intent accuracy raw, 94% with an external validator, at roughly 1.1 seconds on consumer hardware, entirely offline.
+The task does not require world knowledge. On Model A, a small on-device model that cannot answer trivia questions reached 76% intent accuracy raw and 92% with an external validator, at roughly 1.1 seconds on consumer hardware, entirely offline. Model B runs the same task at 0.66 seconds.
 
 The premise that lightweight on-device natural language to UI action mapping is viable now has supporting evidence rather than only an argument.
+
+**But section 5f qualifies the deployment story sharply.** Viability of the mapping is established. Viability of *safeguarding* the mapping against a platform-provided model that changes underneath you is not, and that is now the more interesting open question.

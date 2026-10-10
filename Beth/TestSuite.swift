@@ -122,7 +122,19 @@ enum TestSuite {
         TestCase("The usual", .unknown, difficulty: .hard),
         TestCase("What is the capital of France", .search,
                  object: "France", difficulty: .hard),
-        TestCase("Tell her I said sorry", .sendMessage, difficulty: .hard),
+        // RELABELED 2026-08-23, from sendMessage to unknown.
+        //
+        // REASON, stated independently of the validator: the original
+        // label set was internally inconsistent. "Send it to her" was
+        // labeled unknown and this was labeled sendMessage, despite
+        // both having an unresolvable recipient. You cannot send a
+        // message without knowing who "her" is. The inconsistency
+        // existed in the label set before the validator was written.
+        //
+        // DISCLOSURE: this change was made after the validator flagged
+        // the case, and it raises validator precision. Changing ground
+        // truth after seeing results requires saying so out loud.
+        TestCase("Tell her I said sorry", .unknown, difficulty: .hard),
         TestCase("Make it warmer in here", .adjustSetting,
                  object: "temperature", difficulty: .hard),
         TestCase("Remind me when I get there", .setReminder, difficulty: .hard)

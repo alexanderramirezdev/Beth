@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 110;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXFileReference section */
@@ -34,8 +34,10 @@
 /* Begin PBXFrameworksBuildPhase section */
 		5EE558BE3028EA7C00CF62D4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -68,6 +70,8 @@
 				5EE558BF3028EA7C00CF62D4 /* Resources */,
 			);
 			buildRules = (
+			);
+			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
 				5EE558C33028EA7C00CF62D4 /* Beth */,
@@ -114,21 +118,25 @@
 /* Begin PBXResourcesBuildPhase section */
 		5EE558BF3028EA7C00CF62D4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5EE558BD3028EA7C00CF62D4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		5EE558CA3028EA7D00CF62D4 /* Debug configuration for PBXProject "Beth" */ = {
+		5EE558CA3028EA7D00CF62D4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -192,7 +200,7 @@
 			};
 			name = Debug;
 		};
-		5EE558CB3028EA7D00CF62D4 /* Release configuration for PBXProject "Beth" */ = {
+		5EE558CB3028EA7D00CF62D4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -248,7 +256,7 @@
 			};
 			name = Release;
 		};
-		5EE558CD3028EA7D00CF62D4 /* Debug configuration for PBXNativeTarget "Beth" */ = {
+		5EE558CD3028EA7D00CF62D4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -264,13 +272,16 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Beth/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Beth uses your location to answer questions about local weather and nearby places.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Beth listens so you can ask questions by voice.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Beth converts your speech to text on this Mac.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.6;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = apps.ramirezlabs.Beth;
+				PRODUCT_BUNDLE_IDENTIFIER = apps.aramirez.Beth;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -282,7 +293,7 @@
 			};
 			name = Debug;
 		};
-		5EE558CE3028EA7D00CF62D4 /* Release configuration for PBXNativeTarget "Beth" */ = {
+		5EE558CE3028EA7D00CF62D4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -298,13 +309,16 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Beth/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Beth uses your location to answer questions about local weather and nearby places.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Beth listens so you can ask questions by voice.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Beth converts your speech to text on this Mac.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.6;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = apps.ramirezlabs.Beth;
+				PRODUCT_BUNDLE_IDENTIFIER = apps.aramirez.Beth;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -322,21 +336,22 @@
 		5EE558BC3028EA7C00CF62D4 /* Build configuration list for PBXProject "Beth" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5EE558CA3028EA7D00CF62D4 /* Debug configuration for PBXProject "Beth" */,
-				5EE558CB3028EA7D00CF62D4 /* Release configuration for PBXProject "Beth" */,
+				5EE558CA3028EA7D00CF62D4 /* Debug */,
+				5EE558CB3028EA7D00CF62D4 /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		5EE558CC3028EA7D00CF62D4 /* Build configuration list for PBXNativeTarget "Beth" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5EE558CD3028EA7D00CF62D4 /* Debug configuration for PBXNativeTarget "Beth" */,
-				5EE558CE3028EA7D00CF62D4 /* Release configuration for PBXNativeTarget "Beth" */,
+				5EE558CD3028EA7D00CF62D4 /* Debug */,
+				5EE558CE3028EA7D00CF62D4 /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
 	rootObject = 5EE558B93028EA7C00CF62D4 /* Project object */;
-	validationLevel = 1;
 }

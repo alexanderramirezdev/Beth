@@ -77,6 +77,14 @@ struct ActionLabView: View {
 
                 Spacer()
 
+                Picker("Suite", selection: $viewModel.suite) {
+                    ForEach(ActionLabViewModel.Suite.allCases) { suite in
+                        Text(suite.rawValue).tag(suite)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 170)
+
                 Picker("Trials", selection: $viewModel.trialsPerCase) {
                     Text("1").tag(1)
                     Text("3").tag(3)
@@ -98,14 +106,6 @@ struct ActionLabView: View {
                     .toggleStyle(.switch)
                     .help("Recomputes instantly against the same generations")
 
-                if !viewModel.outcomes.isEmpty {
-                    Text(String(format: "raw %.0f%% -> validated %.0f%%",
-                                viewModel.intentAccuracyRaw * 100,
-                                viewModel.intentAccuracy * 100))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
                 Spacer()
 
                 Text(viewModel.progressText)
@@ -114,10 +114,64 @@ struct ActionLabView: View {
             }
 
             if !viewModel.outcomes.isEmpty {
+                checkComparison
+            }
+
+            if !viewModel.outcomes.isEmpty {
                 scoreboard
             }
         }
         .padding()
+    }
+
+    /// The four-way comparison. Same generations, scored four ways, so
+    /// any difference between columns is the check and not sampling noise.
+    ///
+    ///   Rules     - signature-based: pronoun in slot, empty required slot
+    ///   Grounding - does the extracted value appear in the input at all
+    ///
+    /// They catch different things. Rules catches "Remove those" ->
+    /// object "those", which is grounded and still unusable. Grounding
+    /// catches "Add it" -> object "milk", which is well-formed and
+    /// invented. Neither subsumes the other.
+    private var checkComparison: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 0) {
+                Text("check").frame(width: 90, alignment: .leading)
+                Text("accuracy").frame(width: 75, alignment: .trailing)
+                Text("rejected").frame(width: 70, alignment: .trailing)
+                Text("fixed").frame(width: 55, alignment: .trailing)
+                Text("broken").frame(width: 60, alignment: .trailing)
+                Text("precision").frame(width: 75, alignment: .trailing)
+                Spacer()
+            }
+            .font(.caption2.bold())
+            .foregroundStyle(.tertiary)
+
+            ForEach(ActionLabViewModel.ValidatorMode.allCases) { mode in
+                let report = viewModel.report(for: mode)
+                HStack(spacing: 0) {
+                    Text(mode.rawValue).frame(width: 90, alignment: .leading)
+                    Text(percent(viewModel.accuracy(mode: mode)))
+                        .frame(width: 75, alignment: .trailing)
+                    Text(mode == .off ? "-" : "\(report.rejected)")
+                        .frame(width: 70, alignment: .trailing)
+                    Text(mode == .off ? "-" : "\(report.fixed)")
+                        .frame(width: 55, alignment: .trailing)
+                        .foregroundStyle(report.fixed > 0 ? Color.green : Color.secondary)
+                    Text(mode == .off ? "-" : "\(report.broken)")
+                        .frame(width: 60, alignment: .trailing)
+                        .foregroundStyle(report.broken > 0 ? Color.orange : Color.secondary)
+                    Text(report.precision.map { percent($0) } ?? "-")
+                        .frame(width: 75, alignment: .trailing)
+                    Spacer()
+                }
+                .font(.system(.caption2, design: .monospaced))
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var scoreboard: some View {
@@ -129,8 +183,9 @@ struct ActionLabView: View {
                     metric("Object", percent(object),
                            delta: viewModel.baseline?.object.map { object - $0 })
                 }
-                metric("Stability", percent(viewModel.stability),
+                metric("Intent stab.", percent(viewModel.stability),
                        delta: viewModel.baseline.map { viewModel.stability - $0.stability })
+                metric("Object stab.", percent(viewModel.objectStability))
                 metric("Spread", viewModel.accuracySpread)
                 metric("Median", String(format: "%.2fs", viewModel.medianSeconds))
                 if let cold = viewModel.coldStartSeconds {
@@ -146,6 +201,13 @@ struct ActionLabView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                if viewModel.outOfRangeConfidenceCount > 0 {
+                    Text("\(viewModel.outOfRangeConfidenceCount) out-of-range confidence")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
                 Spacer()
             }
 
@@ -169,6 +231,12 @@ struct ActionLabView: View {
             }
 
             HStack {
+                if let env = viewModel.environment {
+                    Text(env.stamp)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
                 Spacer()
                 Button("Set baseline") {
                     viewModel.snapshotBaseline(label: "previous run")

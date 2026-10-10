@@ -19,6 +19,7 @@ struct BethApp: App {
         WindowGroup {
             RootView()
                 .environment(viewModel)
+                .onAppear { SpeechSynthesizer.logAvailableVoices() }
         }
         .defaultSize(width: 700, height: 820)
     }

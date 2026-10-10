@@ -33,15 +33,38 @@ final class ActionLabViewModel {
         /// Computed once at run time from the raw action.
         let rejection: ActionValidator.Rejection?
 
-        /// What the app would act on, with or without the validator.
-        func effectiveIntent(validated: Bool) -> ActionIntent? {
+        /// Separate from `rejection` on purpose. Signature rules and
+        /// grounding catch different things and are measured apart so
+        /// their contributions can be told from one another.
+        let groundingRejection: ActionValidator.GroundingRejection?
+
+        /// What the app would act on under a given validator mode.
+        func effectiveIntent(mode: ValidatorMode) -> ActionIntent? {
             guard let action else { return nil }
-            if validated && rejection != nil { return .unknown }
-            return action.intent
+            switch mode {
+            case .off:
+                return action.intent
+            case .signatureRules:
+                return rejection != nil ? .unknown : action.intent
+            case .grounding:
+                return groundingRejection != nil ? .unknown : action.intent
+            case .both:
+                return (rejection != nil || groundingRejection != nil)
+                    ? .unknown : action.intent
+            }
+        }
+
+        func isCorrect(mode: ValidatorMode) -> Bool {
+            effectiveIntent(mode: mode) == testCase.expected
+        }
+
+        // Kept so existing call sites continue to compile.
+        func effectiveIntent(validated: Bool) -> ActionIntent? {
+            effectiveIntent(mode: validated ? .both : .off)
         }
 
         func isCorrect(validated: Bool) -> Bool {
-            effectiveIntent(validated: validated) == testCase.expected
+            isCorrect(mode: validated ? .both : .off)
         }
 
         var objectCorrect: Bool? {
@@ -76,6 +99,20 @@ final class ActionLabViewModel {
         }
     }
 
+    /// Which checks are applied when scoring.
+    ///
+    /// Stored generations are scored under each mode without rerunning,
+    /// so the four columns are the SAME samples measured four ways.
+    /// Any difference between them is the check, not sampling noise.
+    enum ValidatorMode: String, CaseIterable, Identifiable {
+        case off = "Off"
+        case signatureRules = "Rules"
+        case grounding = "Grounding"
+        case both = "Both"
+
+        var id: String { rawValue }
+    }
+
     struct Baseline {
         let intent: Double
         let object: Double?
@@ -89,6 +126,10 @@ final class ActionLabViewModel {
     var isRunning = false
     var progressText = ""
     var coldStartSeconds: Double?
+
+    /// Captured at the start of every run and written into the CSV.
+    /// See RunEnvironment for why this is not optional bookkeeping.
+    var environment: RunEnvironment?
     var baseline: Baseline?
 
     /// Toggling this recomputes every metric instantly. No rerun needed.
@@ -96,6 +137,30 @@ final class ActionLabViewModel {
 
     var trialsPerCase = 3
     var includedDifficulties: Set<TestCase.Difficulty> = Set(TestCase.Difficulty.allCases)
+
+    /// Which benchmark to run.
+    ///
+    /// Dev set is TestSuite: the validator rules were derived by
+    /// reading its failures, so scores on it are optimistic by
+    /// construction.
+    ///
+    /// Held-out was written before Rule 3 existed and run only after.
+    /// It is the honest measurement of whether Rule 3 generalizes.
+    enum Suite: String, CaseIterable, Identifiable {
+        case development = "Dev set"
+        case heldOut = "Held-out"
+
+        var id: String { rawValue }
+
+        var cases: [TestCase] {
+            switch self {
+            case .development: return TestSuite.all
+            case .heldOut: return HeldOutSuite.all
+            }
+        }
+    }
+
+    var suite: Suite = .development
 
     var scratchSentence = ""
     var scratchResult = ""
@@ -134,9 +199,49 @@ final class ActionLabViewModel {
 
     /// The same number with the validator forced off, for side-by-side.
     var intentAccuracyRaw: Double {
+        accuracy(mode: .off)
+    }
+
+    /// Accuracy under any single mode, computed from stored generations.
+    /// No rerun: the four modes score identical samples.
+    func accuracy(mode: ValidatorMode) -> Double {
         guard !outcomes.isEmpty else { return 0 }
-        return Double(outcomes.filter { $0.isCorrect(validated: false) }.count)
+        return Double(outcomes.filter { $0.isCorrect(mode: mode) }.count)
             / Double(outcomes.count)
+    }
+
+    /// How many trials each check rejected, and what those rejections
+    /// did to correctness. A check that rejects a wrong answer helps; a
+    /// check that rejects a right answer is a false alarm.
+    struct CheckReport {
+        let rejected: Int
+        let fixed: Int
+        let broken: Int
+
+        var precision: Double? {
+            rejected == 0 ? nil : Double(fixed) / Double(rejected)
+        }
+    }
+
+    func report(for mode: ValidatorMode) -> CheckReport {
+        let rejects: (Outcome) -> Bool
+        switch mode {
+        case .off:
+            return CheckReport(rejected: 0, fixed: 0, broken: 0)
+        case .signatureRules:
+            rejects = { $0.rejection != nil }
+        case .grounding:
+            rejects = { $0.groundingRejection != nil }
+        case .both:
+            rejects = { $0.rejection != nil || $0.groundingRejection != nil }
+        }
+
+        let rejected = outcomes.filter(rejects)
+        return CheckReport(
+            rejected: rejected.count,
+            fixed: rejected.filter { !$0.isCorrect(mode: .off) && $0.isCorrect(mode: mode) }.count,
+            broken: rejected.filter { $0.isCorrect(mode: .off) && !$0.isCorrect(mode: mode) }.count
+        )
     }
 
     var objectAccuracy: Double? {
@@ -149,6 +254,31 @@ final class ActionLabViewModel {
         let summaries = caseSummaries
         guard !summaries.isEmpty else { return 0 }
         return Double(summaries.filter(\.isStable).count) / Double(summaries.count)
+    }
+
+    /// Stability of the OBJECT field, not just intent.
+    ///
+    /// Finding 5d: intent was 100% stable while extraction still
+    /// flipped on individual cases. "Remove eggs from the list"
+    /// produced `eggs` on trials 1 and 3 and an empty object on
+    /// trial 2. Intent-only stability OVERSTATES reliability, so
+    /// both numbers get reported.
+    var objectStability: Double {
+        let summaries = caseSummaries
+        guard !summaries.isEmpty else { return 0 }
+        let stable = summaries.filter { summary in
+            let objects = summary.trials.compactMap { $0.action?.object }
+            guard let first = objects.first else { return true }
+            return objects.allSatisfy { $0 == first }
+        }
+        return Double(stable.count) / Double(summaries.count)
+    }
+
+    /// Confidence values outside the documented 0.0 to 1.0 range.
+    /// Finding 5c: the model emitted 100.0 here. Constrained decoding
+    /// guarantees the type, not the range.
+    var outOfRangeConfidenceCount: Int {
+        outcomes.compactMap(\.action?.confidence).filter { $0 < 0 || $0 > 1 }.count
     }
 
     var trialAccuracies: [Double] {
@@ -224,7 +354,7 @@ final class ActionLabViewModel {
     func runSuite() {
         guard !isRunning else { return }
 
-        let cases = TestSuite.all.filter { includedDifficulties.contains($0.difficulty) }
+        let cases = suite.cases.filter { includedDifficulties.contains($0.difficulty) }
         guard !cases.isEmpty else { return }
 
         isRunning = true
@@ -233,6 +363,7 @@ final class ActionLabViewModel {
         let trials = max(trialsPerCase, 1)
 
         Task {
+            environment = RunEnvironment.capture()
             progressText = "Warming up..."
             coldStartSeconds = await mapper.warmUp()
 
@@ -256,7 +387,9 @@ final class ActionLabViewModel {
                             seconds: result.seconds,
                             errorText: nil,
                             rejection: ActionValidator.check(result.action,
-                                                             sentence: testCase.sentence)
+                                                             sentence: testCase.sentence),
+                            groundingRejection: ActionValidator.groundingRejection(
+                                for: result.action, sentence: testCase.sentence)
                         ))
                     } catch {
                         outcomes.append(Outcome(
@@ -266,7 +399,8 @@ final class ActionLabViewModel {
                             action: nil,
                             seconds: 0,
                             errorText: error.localizedDescription,
-                            rejection: nil
+                            rejection: nil,
+                            groundingRejection: nil
                         ))
                     }
                 }
@@ -303,7 +437,16 @@ final class ActionLabViewModel {
     }
 
     func exportCSV() -> String {
-        var lines = ["sentence,difficulty,trial,expected,raw_predicted,validated_predicted,rejected,reason,raw_correct,validated_correct,object,object_correct,confidence,seconds"]
+        let env = environment
+        var lines: [String] = []
+
+        // Provenance header. Without it a CSV cannot be compared to
+        // any other CSV, because the model underneath is not stable.
+        if let env {
+            lines.append("# suite=\(suite.rawValue) trials=\(trialsPerCase) os=\(env.osVersion) build=\(env.osBuild) run=\(ISO8601DateFormatter().string(from: env.timestamp))")
+        }
+
+        lines.append("sentence,difficulty,trial,expected,raw_predicted,validated_predicted,rejected,reason,grounded,grounding_reason,correct_off,correct_rules,correct_grounding,correct_both,object,object_correct,confidence,seconds,os_build")
         for outcome in outcomes.sorted(by: { $0.testCase.sentence < $1.testCase.sentence }) {
             let sentence = outcome.testCase.sentence.replacingOccurrences(of: ",", with: ";")
             let raw = outcome.action?.intent.rawValue ?? "ERROR"
@@ -314,7 +457,10 @@ final class ActionLabViewModel {
             let objectCorrect = outcome.objectCorrect.map(String.init) ?? ""
             let confidence = outcome.action.map { String(format: "%.2f", $0.confidence) } ?? ""
             let seconds = String(format: "%.3f", outcome.seconds)
-            lines.append("\(sentence),\(outcome.testCase.difficulty.rawValue),\(outcome.trial),\(outcome.testCase.expected.rawValue),\(raw),\(validated),\(rejected),\(reason),\(outcome.isCorrect(validated: false)),\(outcome.isCorrect(validated: true)),\(object),\(objectCorrect),\(confidence),\(seconds)")
+            let grounded = outcome.groundingRejection == nil
+            let groundingReason = outcome.groundingRejection?.rawValue
+                .replacingOccurrences(of: ",", with: ";") ?? ""
+            lines.append("\(sentence),\(outcome.testCase.difficulty.rawValue),\(outcome.trial),\(outcome.testCase.expected.rawValue),\(raw),\(validated),\(rejected),\(reason),\(grounded),\(groundingReason),\(outcome.isCorrect(mode: .off)),\(outcome.isCorrect(mode: .signatureRules)),\(outcome.isCorrect(mode: .grounding)),\(outcome.isCorrect(mode: .both)),\(object),\(objectCorrect),\(confidence),\(seconds),\(env?.osBuild ?? "unknown")")
         }
         return lines.joined(separator: "\n")
     }

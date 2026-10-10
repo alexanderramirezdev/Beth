@@ -27,6 +27,58 @@
 import Foundation
 import FoundationModels
 
+/// Identifies the environment a run was measured in.
+///
+/// WHY THIS EXISTS: between August 1 and August 23, 2026 a macOS beta
+/// update replaced the on-device model. Median latency dropped from
+/// 1.10s to 0.66s and the failure signature changed completely. Every
+/// number recorded before that update describes a different system.
+///
+/// Nothing was logged to tell us which build produced which numbers.
+/// That is now fixed, permanently. Any result without a build stamp is
+/// not a measurement, it is an anecdote.
+struct RunEnvironment {
+    let osVersion: String
+    let osBuild: String
+    let timestamp: Date
+
+    static func capture() -> RunEnvironment {
+        let info = ProcessInfo.processInfo.operatingSystemVersion
+        return RunEnvironment(
+            osVersion: "\(info.majorVersion).\(info.minorVersion).\(info.patchVersion)",
+            osBuild: Self.buildNumber(),
+            timestamp: Date()
+        )
+    }
+
+    /// The build string, e.g. 27A5218g. This is the value that actually
+    /// distinguishes one beta from the next; the marketing version does not.
+    private static func buildNumber() -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sw_vers")
+        process.arguments = ["-buildVersion"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
+        } catch {
+            // Sandboxed builds cannot spawn processes. Fall back rather
+            // than failing the run.
+            return "unavailable"
+        }
+    }
+
+    var stamp: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]
+        return "macOS \(osVersion) (\(osBuild)) at \(formatter.string(from: timestamp))"
+    }
+}
+
 @MainActor
 final class ActionMapper {
 
